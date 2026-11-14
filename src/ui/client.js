@@ -13,6 +13,8 @@
   const { app, clock, persistent, accounts } = HB.ui.bootstrap();
   const brl = U.formatBRL;
   const pl = U.plural;
+  const DEMO = !HB.config || HB.config.demoMode !== false; // recursos de demonstração (simular chegada/data)
+  const shortName = (me) => String(me.name || '').split('@')[0].split(' ')[0];
 
   /* ---------- estado ---------- */
   const t0 = clock.today();
@@ -64,7 +66,7 @@
     const list = app.search({ query: S.dest, checkIn: S.checkIn, checkOut: S.checkOut, guests: S.guests, maxPrice: S.maxPrice, minStars: S.star4 ? 4 : 0, amenities: [...S.amen], sort: S.sort });
     $('#count').textContent = list.length ? `${list.length} ${pl(list.length, 'hotel disponível', 'hotéis disponíveis')} · ${U.formatDate(S.checkIn)} a ${U.formatDate(S.checkOut)} · ${nights} ${pl(nights, 'noite', 'noites')}` : '';
     $('#grid').innerHTML = list.length ? list.map(({ hotel: h, from }) => `
-      <button type="button" class="card" data-hotel="${h.id}">
+      <button type="button" class="card" data-hotel="${esc(h.id)}">
         <div class="pic">${picture(h.scene, h.hue, 'c' + h.id, CAT.photoKeyFor(h), 640)}<span class="tag">${esc(h.highlight)}</span></div>
         <div class="body">
           <h3>${esc(h.name)}</h3>
@@ -78,7 +80,7 @@
   /* ---------- hotel ---------- */
   function openHotel(id) {
     currentHotel = app.hotel(id);
-    if (!currentHotel || currentHotel.active === false) return;
+    if (!currentHotel || currentHotel.active === false) { currentHotel = null; toast('Este hotel não está disponível no momento.'); return; }
     show('hotel'); renderHotel(); window.scrollTo(0, 0);
   }
   function renderHotel() {
@@ -194,7 +196,7 @@
     };
   }
 
-  const pixCode = () => `00020126580014BR.GOV.BCB.PIX0136hotelbox-demo-${U.hash32Hex(D.hotel.id + D.checkIn)}5204000053039865802BR5909E-BOXHOTEL6009SAO PAULO62070503***6304ABCD`;
+  const pixCode = () => `00020126580014BR.GOV.BCB.PIX0136eboxhotel-demo-${U.hash32Hex(D.hotel.id + D.checkIn)}5204000053039865802BR5909E-BOXHOTEL6009SAO PAULO62070503***6304ABCD`;
   function stepPay() {
     $('#stepbody').innerHTML = `<form class="box" id="pform" novalidate><h3 style="font-size:20px;margin-bottom:14px">Forma de pagamento</h3>
       <div class="pays" role="radiogroup" aria-label="Forma de pagamento">
@@ -234,12 +236,14 @@
         const errors = HB.validators.validateCard({ number: $('#c-num').value, holder: $('#c-holder').value, expiry: $('#c-exp').value, cvv: $('#c-cvv').value }, clock.today());
         setErr($('#payx'), errors);
         if (Object.keys(errors).length) return;
-        ['#c-num', '#c-holder', '#c-exp', '#c-cvv'].forEach((s) => { $(s).value = ''; });
       }
+      const payBtn = $('#pay-btn'); if (payBtn.disabled) return; payBtn.disabled = true;
       try {
         D.done = app.book({ hotelId: D.hotel.id, roomTypeId: D.room.id, stay: { checkIn: D.checkIn, checkOut: D.checkOut, guests: D.guests }, guest: D.guest, payment: D.pay, coupon: D.coupon, owner: accounts.current() });
+        ['#c-num', '#c-holder', '#c-exp', '#c-cvv'].forEach((s) => { const el = $(s); if (el) el.value = ''; }); // dados de cartão nunca são guardados
         updateBadge(); D.step = 2; renderPanel();
       } catch (err) {
+        payBtn.disabled = false;
         toast(err.message);
         if (/dispon/.test(err.message)) { closeOverlay(); if (currentHotel) renderRooms(); }
       }
@@ -268,7 +272,7 @@
   function renderAccount() {
     const me = accounts.current();
     const hello = $('#acct-hello'); const btn = $('#acct-btn');
-    hello.hidden = !me; hello.textContent = me ? `Olá, ${String(me.name).split(' ')[0]}` : '';
+    hello.hidden = !me; hello.textContent = me ? `Olá, ${shortName(me)}` : '';
     btn.textContent = me ? 'Sair' : 'Entrar';
     btn.setAttribute('aria-label', me ? 'Sair da conta' : 'Entrar ou criar conta');
     updateBadge();
@@ -277,38 +281,43 @@
   function openAuth(view, after) {
     const ov = $('#overlay'); ov.className = 'overlay center'; ov.hidden = false; document.body.style.overflow = 'hidden';
     const fld = (id, label, type, ph, auto) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="${type}" ${ph ? `placeholder="${ph}"` : ''} autocomplete="${auto}"><span class="err" data-e="${id.slice(2)}"></span></div>`;
-    const tabs = (v) => `<div class="tabs" role="tablist" style="margin:0 0 14px"><button type="button" class="chip" role="tab" aria-pressed="${v === 'in'}" data-v="in">Entrar</button><button type="button" class="chip" role="tab" aria-pressed="${v === 'up'}" data-v="up">Criar conta</button></div>`;
+    const tabs = (v) => `<div class="tabs" role="group" aria-label="Entrar ou criar conta" style="margin:0 0 14px"><button type="button" class="chip" aria-pressed="${v === 'in'}" data-v="in">Entrar</button><button type="button" class="chip" aria-pressed="${v === 'up'}" data-v="up">Criar conta</button></div>`;
     const note = accounts.mode === 'local' ? '<p class="small muted">Modo demonstração: as contas ficam apenas neste navegador.</p>' : '';
     function paint(v) {
       const form = v === 'up' ? `${fld('a-name', 'Nome completo', 'text', '', 'name')}${fld('a-email', 'E-mail', 'email', '', 'email')}${fld('a-password', 'Senha', 'password', 'Mínimo de 8 caracteres, com maiúscula, minúscula e número', 'new-password')}<p class="small muted">Ao criar a conta você concorda com os <a href="#termos">Termos de Uso</a> e a <a href="#privacidade">Política de Privacidade</a>.</p>`
-        : v === 'reset' ? `<p class="muted">Informe o e-mail da conta para receber o link de redefinição.</p>${fld('a-email', 'E-mail', 'email', '', 'email')}`
-          : `${fld('a-email', 'E-mail', 'email', '', 'email')}${fld('a-password', 'Senha', 'password', '', 'current-password')}<p class="small"><button type="button" class="link" data-v="reset">Esqueci minha senha</button></p>`;
-      ov.innerHTML = `<div class="box modal" role="dialog" aria-modal="true" aria-labelledby="at" style="max-width:440px"><div class="phead"><h2 id="at" style="font-size:24px">${v === 'reset' ? 'Recuperar senha' : v === 'up' ? 'Criar conta' : 'Entrar'}</h2><button type="button" class="x" id="aclose" aria-label="Fechar">✕</button></div>
-        ${v === 'reset' ? '' : tabs(v)}<form id="aform" class="stack" novalidate>${form}<div class="alert error" data-general role="alert" hidden></div><div class="alert ok" data-info role="status" hidden></div>${note}
-        <button type="submit" class="btn" id="asubmit">${v === 'up' ? 'Criar conta' : v === 'reset' ? 'Enviar link' : 'Entrar'}</button>${v === 'reset' ? '<button type="button" class="btn secondary" data-v="in">Voltar</button>' : ''}</form></div>`;
+        : v === 'newpass' ? `<p class="muted">Escolha a nova senha da sua conta.</p>${fld('a-password', 'Nova senha', 'password', 'Mínimo de 8 caracteres, com maiúscula, minúscula e número', 'new-password')}`
+          : v === 'reset' ? `<p class="muted">Informe o e-mail da conta para receber o link de redefinição.</p>${fld('a-email', 'E-mail', 'email', '', 'email')}`
+            : `${fld('a-email', 'E-mail', 'email', '', 'email')}${fld('a-password', 'Senha', 'password', '', 'current-password')}<p class="small"><button type="button" class="link" data-v="reset">Esqueci minha senha</button></p>`;
+      const showPw = v === 'reset' ? '' : '<label class="check small"><input type="checkbox" id="a-show"><span>Mostrar senha</span></label>';
+      ov.innerHTML = `<div class="box modal" role="dialog" aria-modal="true" aria-labelledby="at" style="max-width:440px"><div class="phead"><h2 id="at" style="font-size:24px">${v === 'reset' ? 'Recuperar senha' : v === 'newpass' ? 'Nova senha' : v === 'up' ? 'Criar conta' : 'Entrar'}</h2><button type="button" class="x" id="aclose" aria-label="Fechar">✕</button></div>
+        ${v === 'reset' || v === 'newpass' ? '' : tabs(v)}<form id="aform" class="stack" novalidate>${form}${showPw}<div class="alert error" data-general role="alert" hidden></div><div class="alert ok" data-info role="status" hidden></div>${note}
+        <button type="submit" class="btn" id="asubmit">${v === 'up' ? 'Criar conta' : v === 'reset' ? 'Enviar link' : v === 'newpass' ? 'Salvar nova senha' : 'Entrar'}</button>${v === 'reset' ? '<button type="button" class="btn secondary" data-v="in">Voltar</button>' : ''}</form></div>`;
       $('#aclose').onclick = closeOverlay;
       ov.querySelectorAll('[data-v]').forEach((b) => { b.onclick = () => paint(b.dataset.v); });
       const first = ov.querySelector('input'); if (first) first.focus();
       const form$ = $('#aform');
+      const show = $('#a-show'); if (show) show.onchange = () => { form$.querySelectorAll('input[type="password"],input[data-pw]').forEach((i) => { i.type = show.checked ? 'text' : 'password'; i.dataset.pw = '1'; }); };
       form$.onsubmit = async (e) => {
         e.preventDefault();
         const g = form$.querySelector('[data-general]'); const info = form$.querySelector('[data-info]'); const sb = $('#asubmit');
         g.hidden = true; info.hidden = true; form$.querySelectorAll('[data-e]').forEach((x) => { x.textContent = ''; });
         const val = (id) => { const el = $(id); return el ? el.value : ''; };
-        sb.disabled = true;
+        sb.disabled = true; const label = sb.textContent; sb.textContent = 'Aguarde…';
         try {
           const r = v === 'up' ? await accounts.signUp({ name: val('#a-name'), email: val('#a-email'), password: val('#a-password') })
             : v === 'reset' ? await accounts.resetPassword(val('#a-email'))
-              : await accounts.signIn({ email: val('#a-email'), password: val('#a-password') });
+              : v === 'newpass' ? await accounts.updatePassword(val('#a-password'))
+                : await accounts.signIn({ email: val('#a-email'), password: val('#a-password') });
           if (!r.ok) {
             if (r.fields) Object.entries(r.fields).forEach(([k, m]) => { const el = form$.querySelector(`[data-e="${k === 'password' ? 'password' : k}"]`); if (el) el.textContent = m; });
             g.hidden = false; g.textContent = r.error; return;
           }
           if (v === 'reset') { info.hidden = false; info.textContent = r.message; return; }
+          if (v === 'newpass') { closeOverlay(); toast('Senha alterada com sucesso.'); return; }
           if (r.needsConfirm) { paint('in'); const i2 = ov.querySelector('[data-info]'); i2.hidden = false; i2.textContent = 'Conta criada. Enviamos um link de confirmação para o seu e-mail; confirme e depois entre.'; return; }
           closeOverlay(); toast(v === 'up' ? 'Conta criada. Bem-vindo(a)!' : 'Você entrou na sua conta.');
           if (after) after();
-        } catch (err) { g.hidden = false; g.textContent = err.message || 'Não foi possível concluir.'; } finally { sb.disabled = false; }
+        } catch (err) { g.hidden = false; g.textContent = err.message || 'Não foi possível concluir.'; } finally { sb.disabled = false; sb.textContent = label; }
       };
     }
     paint(view);
@@ -317,6 +326,7 @@
     if (accounts.current()) { await accounts.signOut(); toast('Você saiu da conta.'); if (!$('#v-trips').hidden) renderTrips(); } else openAuth('in');
   };
   accounts.onChange(renderAccount);
+  accounts.onRecovery(() => openAuth('newpass'));
   accounts.ready().then(renderAccount);
 
   /* ---------- minhas reservas ---------- */
@@ -324,10 +334,10 @@
     const n = myBookings().filter(HB.booking.isActive).length;
     const b = $('#trip-count'); b.hidden = !n; b.textContent = n;
   }
-  /** Reservas da conta conectada (e as antigas, sem dono, feitas antes do login existir). */
+  /** Somente as reservas da conta conectada (reservas antigas, sem dono, não aparecem para ninguém). */
   function myBookings() {
     const me = accounts.current();
-    return app.store.listBookings().filter((b) => !b.ownerId || (me && b.ownerId === me.id));
+    return me ? app.store.listBookings().filter((b) => b.ownerId === me.id) : [];
   }
   function renderTrips() {
     if (!accounts.current()) {
@@ -337,6 +347,7 @@
     const all = myBookings();
     $('#trips').innerHTML = all.length ? all.map((b) => {
       const h = app.hotel(b.hotelId); const r = h && app.roomView(h, b.roomTypeId);
+      if (!h) return '';
       const active = HB.booking.isActive(b); const terms = HB.booking.cancellationTerms(b, clock.today());
       return `<article class="trip">
         <div class="pic">${picture(h.scene, h.hue, 't' + b.code, CAT.photoKeyFor(h), 480)}</div>
@@ -345,7 +356,7 @@
           <p class="small muted">${esc(r ? r.name : '')} · ${b.guests} ${pl(b.guests, 'hóspede', 'hóspedes')} · ${U.formatDate(b.checkIn)} → ${U.formatDate(b.checkOut)} · ${b.nights} ${pl(b.nights, 'noite', 'noites')}</p>
           <p class="small muted">Total ${brl(b.total)} · ${esc(b.guest.name)} · ${esc(U.maskEmailPrivate(b.guest.email))}${active && terms.allowed && terms.free ? ` · cancelamento sem custo até ${U.formatDate(terms.freeUntil)}` : ''}</p>
           ${active ? `<p><b>Apartamento ${esc(b.roomNumber)}</b> <span class="small muted">· ${b.checkedInAt ? 'Check-in realizado' : 'Check-in pelo QR Code da porta'}</span></p>` : ''}</div>
-        <div class="act">${active ? `<button type="button" class="btn sm" data-plate="${esc(b.code)}">Simular chegada</button>` : ''}${terms.allowed ? `<button type="button" class="btn danger sm" data-cancel="${esc(b.code)}">Cancelar reserva</button>` : ''}<button type="button" class="btn secondary sm" data-open="${h.id}">Ver hotel</button></div></article>`;
+        <div class="act">${active && DEMO ? `<button type="button" class="btn sm" data-plate="${esc(b.code)}">Simular chegada</button>` : ''}${terms.allowed ? `<button type="button" class="btn danger sm" data-cancel="${esc(b.code)}">Cancelar reserva</button>` : ''}<button type="button" class="btn secondary sm" data-open="${esc(h.id)}">Ver hotel</button></div></article>`;
     }).join('') : '<div class="empty">Você ainda não possui reservas.<br><button type="button" class="btn" style="margin-top:14px" data-go="hoteis">Pesquisar hotéis</button></div>';
   }
   function confirmCancel(code) {
@@ -379,7 +390,7 @@
   const setDoorState = (code, s) => { const all = { ...(app.store.getPrefs().doorFails || {}) }; all[code] = s; app.store.setPrefs({ doorFails: all }); };
 
   function doorShell(inner) {
-    return `<div class="doorcard">${inner}<div class="demo"><input type="checkbox" id="demo-day" ${demoDay ? 'checked' : ''}><label for="demo-day">Demonstração: simular que hoje é a data de entrada</label></div></div>`;
+    return `<div class="doorcard">${inner}${DEMO ? `<div class="demo"><input type="checkbox" id="demo-day" ${demoDay ? 'checked' : ''}><label for="demo-day">Demonstração: simular que hoje é a data de entrada</label></div>` : ''}</div>`;
   }
   function renderDoor(hid, no) {
     const el = $('#v-door'); const h = app.hotel(hid);
@@ -388,7 +399,7 @@
     const head = h ? `<p class="small muted">${esc(h.name)}</p><div class="no" style="font:600 60px var(--display)">${esc(no)}</div>` : '';
     if (!h) { el.innerHTML = `<div class="doorcard"><div class="box"><h2>QR Code não reconhecido</h2><p class="muted" style="margin:8px 0 14px">Este código não pertence a nenhum apartamento do E-BoxHotel.</p><button type="button" class="btn" data-go="hoteis">Ir para o início</button></div></div>`; return; }
     const cand = app.store.listBookings().find((b) => HB.booking.isActive(b) && b.hotelId === hid && b.roomNumber === no);
-    clock.override = demoDay && cand ? cand.checkIn : null;
+    clock.override = DEMO && demoDay && cand ? cand.checkIn : null;
     const st = HB.booking.checkInStatus({ bookings: app.store.listBookings(), hotelId: hid, roomNumber: no, todayIso: clock.today() });
     const msg = {
       'not-found': ['Reserva não localizada', 'Não encontramos uma reserva ativa para este apartamento neste aparelho. Abra o QR Code no mesmo celular em que a reserva foi feita.'],
@@ -460,7 +471,7 @@
   });
   window.addEventListener('hashchange', route);
 
-  HB.ui.initTheme(app);
+  HB.ui.initTheme(app); HB.ui.watchOverlay();
   $('#storage-warning').innerHTML = HB.ui.storageWarning(persistent);
   initSearch(); updateBadge(); route();
   root.HB.client = { app }; // depuração e testes de interface

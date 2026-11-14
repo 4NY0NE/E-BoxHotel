@@ -43,6 +43,10 @@
     if (/not confirmed/i.test(m)) return 'Confirme seu e-mail pelo link que enviamos antes de entrar.';
     if (/rate limit|too many/i.test(m)) return 'Muitas tentativas. Aguarde alguns minutos.';
     if (/network|fetch/i.test(m)) return 'Sem conexão com o servidor. Tente novamente.';
+    if (/invalid.*email|email.*invalid|unable to validate email/i.test(m)) return 'Informe um e-mail válido.';
+    if (/password.*(weak|short|at least)|weak password/i.test(m)) return 'Senha fraca. Use 8 ou mais caracteres, com maiúscula, minúscula e número.';
+    if (/same.*password|different from the old/i.test(m)) return 'Escolha uma senha diferente da atual.';
+    if (/signups? not allowed|signup.*disabled/i.test(m)) return 'Novos cadastros estão desativados no momento.';
     return 'Não foi possível concluir. Tente novamente.';
   };
 
@@ -51,6 +55,7 @@
     const cloud = Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey && sdk && sdk.createClient);
     const mode = cloud ? 'supabase' : 'local';
     const listeners = new Set();
+    const recoveryListeners = new Set();
     let user = null;
     const emit = () => listeners.forEach((fn) => { try { fn(user); } catch { /* ouvinte não deve quebrar a autenticação */ } });
     const read = (k, d) => { try { const v = backend.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
@@ -61,9 +66,13 @@
     const fromSb = (u) => (u ? { id: u.id, email: u.email, name: (u.user_metadata && u.user_metadata.name) || u.email } : null);
 
     if (cloud) {
-      client = sdk.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+      // PKCE: o retorno dos e-mails (confirmação e recuperação) vem em ?code=..., sem conflitar com as rotas "#..." do site.
+      client = sdk.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
       readyPromise = client.auth.getSession().then(({ data }) => { user = fromSb(data.session && data.session.user); emit(); }).catch(() => {});
-      client.auth.onAuthStateChange((_ev, session) => { user = fromSb(session && session.user); emit(); });
+      client.auth.onAuthStateChange((ev, session) => {
+        user = fromSb(session && session.user); emit();
+        if (ev === 'PASSWORD_RECOVERY') recoveryListeners.forEach((fn) => { try { fn(); } catch { /* ouvinte não deve quebrar a autenticação */ } });
+      });
     } else {
       const s = read(KEY_SESSION, null);
       if (s && s.exp > clock.now() && read(KEY_USERS, {})[s.email]) user = { id: s.id, email: s.email, name: s.name };
@@ -140,9 +149,19 @@
       return { ok: true, message: 'Na versão de demonstração não há envio de e-mail. Crie uma nova conta com outro e-mail.' };
     }
 
+    /** Define a nova senha depois de abrir o link de recuperação enviado por e-mail (somente com Supabase). */
+    async function updatePassword(password) {
+      const issues = passwordIssues(password);
+      if (issues.length) return { ok: false, fields: { password: issues.join(' ') }, error: issues[0] };
+      if (!cloud || !user) return { ok: false, error: 'Abra o link de recuperação enviado ao seu e-mail.' };
+      const { error } = await client.auth.updateUser({ password });
+      return error ? { ok: false, error: friendly(error.message) } : { ok: true };
+    }
+
     return {
-      mode, current: () => user, ready: () => readyPromise, signUp, signIn, signOut, resetPassword,
+      mode, current: () => user, ready: () => readyPromise, signUp, signIn, signOut, resetPassword, updatePassword,
       onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
+      onRecovery: (fn) => { recoveryListeners.add(fn); return () => recoveryListeners.delete(fn); },
     };
   }
 

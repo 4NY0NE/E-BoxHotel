@@ -11,5 +11,9 @@
   root.HB.config = Object.freeze({
     supabaseUrl: 'https://gigygvqesuqxzswmsnym.supabase.co',
     supabaseAnonKey: 'sb_publishable_qzlXGVoX_NWdPeur4UzGnA_Tl3Iz1N7',
+    // Endereço público do site (usado nos QR Codes das portas). Vazio = endereço da página atual.
+    publicUrl: 'https://hotelbox-dxv7.netlify.app/',
+    // true = mostra os recursos de demonstração (simular chegada e data de entrada). Use false em produção.
+    demoMode: true,
   });
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -25,4 +25,12 @@
     deferred = null; btn.hidden = true;
   });
   window.addEventListener('appinstalled', () => { if (btn) btn.hidden = true; });
+
+  // iPhone/iPad (Safari) não oferece o botão de instalar: mostra o caminho manual, uma vez, fora do app já instalado.
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  const standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  if (btn && ios && !standalone) {
+    btn.hidden = false;
+    btn.addEventListener('click', () => { if (!deferred) HB.ui.toast('No Safari, toque em Compartilhar e depois em "Adicionar à Tela de Início".'); });
+  }
 })(typeof window !== 'undefined' ? window : globalThis);

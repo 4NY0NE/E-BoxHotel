@@ -1,7 +1,7 @@
 /* E-BoxHotel — service worker. Funciona só em HTTPS (ou localhost); em file:// o site segue normal, sem modo offline.
    Estratégias: casca do aplicativo pré-armazenada; navegação com reserva offline; fotos do Unsplash em cache dinâmico limitado. */
 'use strict';
-const VERSION = 'hb-3.0.0';
+const VERSION = 'hb-3.1.0';
 const SHELL = `${VERSION}-shell`;
 const PHOTOS = `${VERSION}-fotos`;
 const MAX_PHOTOS = 60;

@@ -13,10 +13,30 @@
     const { POLICY } = HB.catalog;
 
     /* ---------- catálogo (hotéis e tipos de apartamento) ---------- */
+    /**
+     * Atualiza catálogos salvos por versões antigas (o catálogo fica no navegador e só era criado uma vez):
+     * troca o nome da marca e acrescenta o Apartamento Modular aos hotéis de demonstração. É idempotente.
+     */
+    function upgradeCatalog(c) {
+      let changed = false;
+      const seed = new Map(HB.catalog.HOTELS.map((h) => [h.id, h]));
+      for (const h of c) {
+        if (/^Hotel Box\b/.test(h.name)) { h.name = h.name.replace(/^Hotel Box\b/, 'E-BoxHotel'); changed = true; }
+        const s = seed.get(h.id);
+        const m = s && s.rooms.find((r) => r.id === 'm');
+        if (m && !h.rooms.some((r) => r.id === 'm') && h.rooms.length < HB.catalog.LIMITS.maxRoomTypes) {
+          h.rooms.push({ ...m, plan: m.plan.map((a) => ({ ...a })), blocked: false, active: true });
+          changed = true;
+        }
+      }
+      return changed;
+    }
     function loadCatalog() {
       let c = store.getCatalog();
       if (!c) {
         c = HB.catalog.seedCatalog(store.getInventory());
+        store.setCatalog(c);
+      } else if (upgradeCatalog(c)) {
         store.setCatalog(c);
       }
       return c;

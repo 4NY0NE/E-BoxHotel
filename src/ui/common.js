@@ -92,7 +92,9 @@
       now: () => Date.now(),
       today() { return this.override || HB.util.toIsoDate(new Date()); },
     };
-    const app = HB.createApp({ backend: local.backend, sessionBackend: sess.backend, clock });
+    // Códigos de reserva e PINs usam o gerador criptográfico do navegador (Math.random é previsível).
+    const random = () => (root.crypto && root.crypto.getRandomValues ? root.crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296 : Math.random());
+    const app = HB.createApp({ backend: local.backend, sessionBackend: sess.backend, clock, random });
     const accounts = HB.accounts ? HB.accounts.createAccounts({ backend: local.backend, clock, config: HB.config, sdk: root.supabase }) : null;
     return { app, clock, persistent: local.persistent, accounts };
   }
@@ -146,9 +148,30 @@
     return `<svg class="plan" viewBox="0 0 ${vw} ${vh}" role="img" aria-label="${escapeHtml(label)}" data-uid="${escapeHtml(uid)}"><g transform="translate(${PADL} ${PADT})">${g}</g></svg>`;
   }
 
+  /**
+   * Acessibilidade das janelas (#overlay): prende o foco do teclado dentro da janela aberta e devolve o foco
+   * ao elemento que a abriu quando ela fecha. Observa o atributo "hidden", então vale para qualquer janela.
+   */
+  function watchOverlay() {
+    const ov = $('#overlay'); if (!ov) return;
+    let opener = null; let lastOutside = null;
+    document.addEventListener('focusin', (e) => { if (!ov.contains(e.target)) lastOutside = e.target; });
+    const focusables = () => $$('button,input,select,textarea,a[href],summary,[tabindex]:not([tabindex="-1"])', ov).filter((x) => !x.disabled && x.offsetParent !== null);
+    new MutationObserver(() => {
+      if (!ov.hidden) { if (!opener) opener = lastOutside; } else if (opener) { try { opener.focus({ preventScroll: true }); } catch { /* elemento removido */ } opener = null; }
+    }).observe(ov, { attributes: true, attributeFilter: ['hidden'] });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab' || ov.hidden) return;
+      const f = focusables(); if (!f.length) return;
+      const first = f[0]; const last = f[f.length - 1];
+      if (!ov.contains(document.activeElement)) { e.preventDefault(); first.focus(); return; }
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+  }
+
   function storageWarning(persistent) {
     return persistent ? '' : '<div class="alert error" role="alert">Este navegador bloqueou o armazenamento local. As informações serão perdidas ao fechar a página.</div>';
   }
 
-  HB.ui = Object.freeze({ $, $$, scene, picture, planSvg, qrSvg, toast, initTheme, bootstrap, storageWarning, esc: escapeHtml });
+  HB.ui = Object.freeze({ $, $$, scene, picture, planSvg, qrSvg, toast, initTheme, bootstrap, storageWarning, watchOverlay, esc: escapeHtml });
 })(typeof window !== 'undefined' ? window : globalThis);
