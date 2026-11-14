@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" role="img" aria-label="E-BoxHotel — chegue, escaneie, descanse">
+  <g transform="translate(0 0)">
+    <rect x="2" y="2" width="60" height="60" rx="12" fill="#14365d"/>
+    <path d="M32 11 54 22v4H10v-4z" fill="#c9a24a"/>
+    <rect x="12" y="29" width="40" height="23" rx="2" fill="#f4f5f7"/>
+    <path d="M25 52V38a7 7 0 0 1 14 0v14z" fill="#14365d"/>
+    <circle cx="35.5" cy="44.5" r="1.4" fill="#c9a24a"/>
+    <g fill="#14365d"><rect x="14.5" y="32" width="4" height="4"/><rect x="45.5" y="32" width="4" height="4"/><rect x="14.5" y="40" width="4" height="4"/><rect x="45.5" y="40" width="4" height="4"/></g>
+  </g>
+  <text x="76" y="36" font-family="Georgia, 'Source Serif 4', serif" font-weight="600" font-size="31" fill="#14365d">E-Box<tspan fill="#8f6a1f">Hotel</tspan></text>
+  <text x="77" y="54" font-family="'Source Sans 3', 'Segoe UI', sans-serif" font-weight="600" font-size="10.5" letter-spacing="2.4" fill="#566274">CHEGUE · ESCANEIE · DESCANSE</text>
+</svg>

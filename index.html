@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file: 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' file: data: https://images.unsplash.com; manifest-src 'self'; worker-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; base-uri 'none'; form-action 'none'">
+<meta name="description" content="E-BoxHotel: reserve hotéis on-line e acesse o apartamento por QR Code, sem passar pela recepção.">
+<title>E-BoxHotel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="assets/brand/favicon.svg">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="E-BoxHotel">
+<meta name="theme-color" content="#14365d">
+<link rel="stylesheet" href="assets/css/base.css">
+</head>
+<body>
+<a class="skip" href="#conteudo">Ir para o conteúdo</a>
+<header class="top"><div class="wrap">
+  <button type="button" class="brand" id="brand" aria-label="E-BoxHotel, página inicial"><img class="mark" src="assets/brand/logo-mark.svg" alt="" width="34" height="34">E-BoxHotel</button>
+  <nav aria-label="Principal">
+    <button type="button" id="nav-home" data-go="hoteis">Hotéis</button>
+    <button type="button" id="nav-trips" data-go="minhas-reservas">Minhas reservas<span class="badge" id="trip-count" hidden>0</span></button>
+    <span id="acct-hello" class="small" hidden></span>
+    <button type="button" id="acct-btn">Entrar</button>
+    <button type="button" id="install-btn" hidden>Instalar aplicativo</button>
+    <button type="button" class="theme-btn" id="theme-btn">Tema: automático</button>
+  </nav>
+</div></header>
+
+<main id="conteudo">
+<div class="wrap" id="storage-warning"></div>
+
+<section id="v-home" class="wrap" aria-labelledby="h-home">
+  <div class="hero">
+    <p class="eyebrow">Reservas on-line</p>
+    <h1 id="h-home">Reserve à distância e entre direto no seu apartamento.</h1>
+    <p class="lead">Escolha o hotel e as datas, conclua o pagamento pelo celular e, na chegada, leia o QR Code da porta. Nenhum atendimento presencial é necessário.</p>
+    <form class="search" id="search" novalidate aria-label="Buscar hotéis">
+      <div class="field"><label for="q-dest">Destino</label><input id="q-dest" list="cities" placeholder="Cidade ou nome do hotel" autocomplete="off"><datalist id="cities"></datalist></div>
+      <div class="field"><label for="q-in">Entrada</label><input id="q-in" type="date"></div>
+      <div class="field"><label for="q-out">Saída</label><input id="q-out" type="date"></div>
+      <div class="field"><label for="q-g">Hóspedes</label><select id="q-g"></select></div>
+      <button class="btn" type="submit">Pesquisar</button>
+      <div class="alert error" id="q-err" role="alert" hidden></div>
+    </form>
+    <ol class="how" aria-label="Como funciona">
+      <li><b>Escolha e reserve</b>Compare hotéis, apartamentos e tarifas com disponibilidade em tempo real.</li>
+      <li><b>Pague com segurança</b>Pix com desconto, cartão em até 3 parcelas ou pagamento no hotel.</li>
+      <li><b>Entre pelo QR Code</b>Leia o código da porta, confirme sua identidade e acesse o apartamento.</li>
+    </ol>
+  </div>
+  <div class="filters" id="filters" role="group" aria-label="Filtros">
+    <div class="range"><label for="f-price">Valor máximo</label><input id="f-price" type="range" min="150" max="1200" step="10" value="1200"><output id="f-price-o" for="f-price">R$ 1.200+</output></div>
+    <button type="button" class="chip" data-star="4" aria-pressed="false">4 estrelas ou mais</button>
+    <span id="f-amen" style="display:contents"></span>
+    <span class="grow"></span>
+    <label class="sr-only" for="f-sort">Ordenar por</label>
+    <select id="f-sort"><option value="rec">Recomendados</option><option value="price">Menor preço</option><option value="rate">Melhor avaliação</option></select>
+  </div>
+  <p class="count" id="count" aria-live="polite"></p>
+  <div class="grid" id="grid"></div>
+</section>
+
+<section id="v-hotel" class="wrap" hidden></section>
+
+<section id="v-trips" class="wrap" hidden aria-labelledby="h-trips">
+  <div class="hero" style="padding-bottom:12px"><p class="eyebrow">Área do hóspede</p><h1 id="h-trips" style="font-size:clamp(28px,4vw,38px)">Minhas reservas</h1>
+  <p class="lead" style="font-size:16px">Consulte os dados da estadia, simule a chegada pelo QR Code ou cancele conforme a política do hotel.</p></div>
+  <div class="trips" id="trips"></div>
+</section>
+
+<section id="v-door" class="wrap" hidden aria-live="polite"></section>
+
+<section id="v-termos" class="wrap legal" hidden>
+  <h1>Termos de Uso</h1><p class="muted small">Versão de demonstração. Textos ilustrativos, sujeitos a revisão jurídica antes de uso comercial.</p>
+  <h2>1. Objeto</h2><p>O E-BoxHotel permite pesquisar hotéis, reservar apartamentos e acessá-los por QR Code, sem atendimento presencial.</p>
+  <h2>2. Reserva e pagamento</h2><p>A reserva é confirmada após a conclusão do pagamento ou, na opção "pagar no hotel", com a apresentação de cartão de garantia no check-in. Os valores incluem taxas e serviços informados no resumo da reserva.</p>
+  <h2>3. Cancelamento</h2><p>O cancelamento é gratuito até 48 horas antes da data de entrada. Após esse prazo, até a data de entrada, é retida a primeira diária. Depois da data de entrada, o cancelamento on-line não é permitido.</p>
+  <h2>4. Acesso ao apartamento</h2><p>O QR Code da porta libera o acesso somente ao titular da reserva, durante o período contratado, mediante confirmação dos três últimos dígitos do CPF. O hóspede não deve compartilhar o PIN de apoio com terceiros.</p>
+  <h2>5. Responsabilidades</h2><p>O hóspede responde pela exatidão dos dados informados e pelo uso adequado das instalações.</p>
+  <p style="margin-top:20px"><button type="button" class="btn secondary" data-go="hoteis">Voltar ao início</button></p>
+</section>
+
+<section id="v-privacidade" class="wrap legal" hidden>
+  <h1>Política de Privacidade</h1><p class="muted small">Versão de demonstração, estruturada conforme a Lei Geral de Proteção de Dados (Lei nº 13.709/2018).</p>
+  <h2>1. Dados que tratamos</h2><p>Nome, e-mail, celular, CPF, horário previsto de chegada e observações da reserva. Os dados do cartão são validados no seu navegador e descartados; nunca são gravados.</p>
+  <h2>2. Finalidade e base legal</h2><p>Os dados são usados para executar o contrato de hospedagem, confirmar a identidade do hóspede no acesso ao apartamento e cumprir obrigações legais. A base legal é a execução de contrato, com o seu consentimento registrado na reserva.</p>
+  <h2>3. Minimização</h2><p>Guardamos o CPF apenas de forma mascarada e um resumo criptográfico dos três últimos dígitos, usado para liberar a porta. O e-mail é exibido parcialmente nas telas.</p>
+  <h2>4. Onde ficam os dados</h2><p>Nesta versão de demonstração, tudo permanece no armazenamento local do seu navegador e não é enviado a nenhum servidor. As fotografias dos hotéis são carregadas do serviço Unsplash; ao exibi-las, o seu navegador se comunica com esse serviço (endereço IP e dados técnicos da conexão), sem envio de dados de reserva.</p>
+  <h2>5. Seus direitos</h2><p>Você pode solicitar confirmação, acesso, correção e exclusão dos dados, conforme o art. 18 da LGPD, pelo canal do encarregado de dados do hotel.</p>
+  <p style="margin-top:20px"><button type="button" class="btn secondary" data-go="hoteis">Voltar ao início</button></p>
+</section>
+</main>
+
+<footer class="site"><div class="wrap">
+  <span>E-BoxHotel · Versão de demonstração: hotéis e tarifas fictícios, sem cobrança real. As reservas ficam apenas neste navegador.</span>
+  <span><a href="#termos">Termos de Uso</a> · <a href="#privacidade">Política de Privacidade</a></span>
+</div></footer>
+
+<div id="overlay" class="overlay" hidden></div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script src="vendor/qrcode-generator-1.4.4.js"></script>
+<script src="vendor/supabase-js-2.119.0.js"></script>
+<script src="src/core/config.js"></script>
+<script src="src/core/util.js"></script>
+<script src="src/core/validators.js"></script>
+<script src="src/domain/catalog.js"></script>
+<script src="src/domain/pricing.js"></script>
+<script src="src/domain/booking.js"></script>
+<script src="src/data/storage.js"></script>
+<script src="src/security/auth.js"></script>
+<script src="src/security/accounts.js"></script>
+<script src="src/core/app.js"></script>
+<script src="src/ui/common.js"></script>
+<script src="src/ui/client.js"></script>
+<script src="src/ui/pwa.js"></script>
+</body>
+</html>
